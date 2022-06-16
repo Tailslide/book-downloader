@@ -28,6 +28,7 @@ KNOWN BUGS: If there are no search results, it hangs forever. Sorry.
 #Preferred filetype:
 filetypes = ".mobi,.epub"
 searchtimeout = 20
+starttimeout = 20
 alwaysoverwrite = True
 acceptfirst = True
 
@@ -93,7 +94,7 @@ def userselect(filename):
                         return ""
 
 class TestBot(irc.bot.SingleServerIRCBot):
-    def __init__(self, searchterm, channel, nickname, server, port=6667):
+    def __init__(self, searchterm,  localfolder, channel, nickname, server, port=6667,):
         irc.bot.SingleServerIRCBot.__init__(
             self, [(server, port)], nickname, nickname)
         self.channel = channel
@@ -101,14 +102,17 @@ class TestBot(irc.bot.SingleServerIRCBot):
         self.received_bytes = 0
         self.havebook = False
         self.havesearchresults = False
+        self.localfolder = localfolder
         
     def on_nicknameinuse(self, c, e): #handle username conflicts
         c.nick(c.get_nickname() + "_")
 
     def on_welcome(self, c, e):
         c.join(self.channel)
+        print ("waiting after join")
+        time.sleep(starttimeout)
+        print("Searching for " + self.searchterm + "..\n")
         self.connection.privmsg(self.channel, "@search " + self.searchterm)
-        print("Searching ...\n")
         time.sleep(searchtimeout)
         if not self.havesearchresults:
             print("No search results found")
@@ -128,7 +132,8 @@ class TestBot(irc.bot.SingleServerIRCBot):
         if command != "SEND":
             return
         print("peer sending file on port" + str(peer_port))
-        self.filename = os.path.basename(filename)
+        #self.filename = os.path.basename(filename)
+        self.filename = self.localfolder + "/" + filename
         if os.path.exists(self.filename) and not alwaysoverwrite:
             answer = input(
                 "A file named", self.filename,
@@ -138,6 +143,7 @@ class TestBot(irc.bot.SingleServerIRCBot):
                 self.die()
                 return
             print("Overwriting ... \n")
+        printf("writing file " + self.filename)
         self.file = open(self.filename, "wb")
         peer_address = irc.client.ip_numstr_to_quad(peer_address)
         peer_port = int(peer_port)
@@ -194,60 +200,65 @@ def main():
 
     global nickname
     searchterm = ""
-    readarrUrl = os.getenv('READARR_URL')
-    readarrApiKey = os.getenv('READARR_API_KEY')
+    #readarrUrl = os.getenv('READARR_URL')
+    #readarrApiKey = os.getenv('READARR_API_KEY')
     nickname = os.getenv('NICK')
     localfolder = os.getenv('LOCAL_TEMP_FOLDER')
-    containerfolder = os.getenv('READARR_TEMP_FOLDER')
-    if len(sys.argv) == 6:
-        nickname = sys.argv[1]
-        readarrUrl = sys.argv[2]
-        readarrApiKey = sys.argv[3]
-        localfolder = sys.argv[4]
-        containerfolder = sys.argv[5]
-    elif len(sys.argv) == 3:
+    #containerfolder = os.getenv('READARR_TEMP_FOLDER')
+    searchterm = os.getenv('SEARCH_TERM')
+#    if len(sys.argv) == 6:
+#        nickname = sys.argv[1]
+#        readarrUrl = sys.argv[2]
+#        readarrApiKey = sys.argv[3]
+#        localfolder = sys.argv[4]
+#        containerfolder = sys.argv[5]
+#    elif len(sys.argv) == 3:
+    if len(sys.argv) == 4:
         searchterm = sys.argv[1]
         nickname = sys.argv[2]
+        localfolder = sys.argv[3]
+    if searchterm == "" or searchterm == None:
+        print("Usage: testbot [<searchterm> <nickname> <localfolder>]")
     else:
-        if (readarrUrl == "" or readarrUrl == None):
-            print("Usage: testbot [<searchterm> <nickname>] | [<nickname> <readarrUrl> <readarrApiKey> <localfolder> <containerfolder>]")
-            searchterm = input("Enter Search Term(s):\n")
-            if nickname == "":
-                nickname = input("Enter Nickname:\n")
-    print (readarrUrl)
-    if (readarrUrl != "" and readarrUrl != None):
-        processfiles(readarrUrl, readarrApiKey, localfolder, containerfolder)
-        headers = {'X-Api-Key': readarrApiKey}
-        page=1
-        wanted = []
-        while True:
-            response = requests.get(readarrUrl + "/api/v1/wanted/missing?includeAuthor=false&pageSize=10&page=" + str(page),
-                                    headers=headers)
-            if response != 200:
-                data = response.json()
-                recs = data["records"]
-                if len(recs) == 0:
-                    break
-                wanted = wanted + recs
-            else:
-                print("Error:" + str(response))
-                break
-            page = page+1
-        print("Wanted Books:")
-        for r in wanted:
-            print("\t" + r["author"]["authorName"] + " - " + r["title"])
-        w = random.choice(wanted)
-        searchterm = w["author"]["authorName"] + " - " + w["title"]
-        print("\nRandomly selected:" +searchterm)
-    #return
-    #searchterm = "Kurt Vonnegut Jr. - God Bless You, Dr. Kevorkian" #this has no results
-    server = "irc.irchighway.net"
-    port = 6667
-    channel = "#ebooks"
-    bot = TestBot(searchterm, channel, nickname, server, port)
-    bot.start()
-    print("Downloaded:" + bot.filename)
-    processfiles(readarrUrl, readarrApiKey, localfolder, containerfolder)
+        #        if (readarrUrl == "" or readarrUrl == None):
+        #            print("Usage: testbot [<searchterm> <nickname>] | [<nickname> <readarrUrl> <readarrApiKey> <localfolder> <containerfolder>]")
+        #            searchterm = input("Enter Search Term(s):\n")
+        #            if nickname == "":
+        #                nickname = input("Enter Nickname:\n")
+        #     print (readarrUrl)
+        #     if (readarrUrl != "" and readarrUrl != None):
+        #         processfiles(readarrUrl, readarrApiKey, localfolder, containerfolder)
+        #         headers = {'X-Api-Key': readarrApiKey}
+        #         page=1
+        #         wanted = []
+        #         while True:
+        #             response = requests.get(readarrUrl + "/api/v1/wanted/missing?includeAuthor=false&pageSize=10&page=" + str(page),
+        #                                     headers=headers)
+        #             if response != 200:
+        #                 data = response.json()
+        #                 recs = data["records"]
+        #                 if len(recs) == 0:
+        #                     break
+        #                 wanted = wanted + recs
+        #             else:
+        #                 print("Error:" + str(response))
+        #                 break
+        #             page = page+1
+        #         print("Wanted Books:")
+        #         for r in wanted:
+        #             print("\t" + r["author"]["authorName"] + " - " + r["title"])
+        #         w = random.choice(wanted)
+        #         searchterm = w["author"]["authorName"] + " - " + w["title"]
+        #         print("\nRandomly selected:" +searchterm)
+        #return
+        #searchterm = "Kurt Vonnegut Jr. - God Bless You, Dr. Kevorkian" #this has no results
+        server = "irc.irchighway.net"
+        port = 6667
+        channel = "#ebooks"
+        bot = TestBot(searchterm, localfolder, channel, nickname, server, port)
+        bot.start()
+        print("Downloaded:" + bot.filename)
+        #processfiles(readarrUrl, readarrApiKey, localfolder, containerfolder)
 
 if __name__ == "__main__":
     main()
