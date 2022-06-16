@@ -175,6 +175,7 @@ class TestBot(irc.bot.SingleServerIRCBot):
             book = userselect(self.filename)
             if book != "":
                 self.timer = threading.Timer(dltimeout, self.handle_timeout)
+                self.timer.start()
                 self.received_bytes = 0
                 self.connection.privmsg(self.channel, book)
                 self.havebook = True
