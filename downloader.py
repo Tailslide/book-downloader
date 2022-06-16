@@ -27,8 +27,7 @@ KNOWN BUGS: If there are no search results, it hangs forever. Sorry.
 #Settings:
 #Preferred filetype:
 filetypes = ".mobi,.epub"
-searchtimeout = 20
-starttimeout = 20
+searchtimeout = 60
 alwaysoverwrite = True
 acceptfirst = True
 
@@ -58,6 +57,7 @@ import irc.client
 from os import listdir
 from os.path import isfile, join
 import shutil
+import threading
 
 def get_script_path():
     return os.path.dirname(os.path.realpath(sys.argv[0]))
@@ -101,7 +101,6 @@ class TestBot(irc.bot.SingleServerIRCBot):
         self.searchterm = searchterm
         self.received_bytes = 0
         self.havebook = False
-        self.havesearchresults = False
         self.localfolder = localfolder
         
     def on_nicknameinuse(self, c, e): #handle username conflicts
@@ -109,14 +108,15 @@ class TestBot(irc.bot.SingleServerIRCBot):
 
     def on_welcome(self, c, e):
         c.join(self.channel)
-        print ("waiting after join")
-        time.sleep(starttimeout)
-        print("Searching for " + self.searchterm + "..\n")
+        self.timer = threading.Timer(searchtimeout, self.handle_timeout)
+        self.timer.start()
         self.connection.privmsg(self.channel, "@search " + self.searchterm)
-        time.sleep(searchtimeout)
-        if not self.havesearchresults:
-            print("No search results found")
-            self.die()
+        print("Searching ...\n")
+
+    def handle_timeout(self):
+        print("No search results found")
+        self.timer.cancel()
+        os._exit(1)
 
     def on_ctcp(self, connection, event):
         #Handle the actual download
@@ -143,7 +143,7 @@ class TestBot(irc.bot.SingleServerIRCBot):
                 self.die()
                 return
             print("Overwriting ... \n")
-        printf("writing file " + self.filename)
+        print("writing file " + self.filename)
         self.file = open(self.filename, "wb")
         peer_address = irc.client.ip_numstr_to_quad(peer_address)
         peer_port = int(peer_port)
@@ -165,7 +165,6 @@ class TestBot(irc.bot.SingleServerIRCBot):
         #Download actual book:
         #Have the user pick which one to download:
         if not self.havebook:
-            self.havesearchresults =True
             if not acceptfirst:
                 print("Search Complete. Please select file to download:\n")
             book = userselect(self.filename)
@@ -179,6 +178,7 @@ class TestBot(irc.bot.SingleServerIRCBot):
             else:
                 self.die() #end if user picked quit
         else:
+            self.timer.cancel()
             self.die() #end program when the book disconnect finishes
 
     def search(self, searchterm):
