@@ -169,14 +169,14 @@ class TestBot(irc.bot.SingleServerIRCBot):
     def search(self, searchterm):
         self.connection.privmsg(self.channel, searchterm)
 
-def processfiles(readarrUrl, readarrApiKey, importfolder):
+def processfiles(readarrUrl, readarrApiKey, localfolder, containerfolder):
     thispath = get_script_path()
     onlyfiles = [f for f in listdir(thispath) if isfile(join(thispath, f)) and f.endswith(tuple(filetypes.split(",")))]
     for f in onlyfiles:
-        print("Importing: " + f + " to " + importfolder)
-        shutil.move(f, importfolder)
+        print("Importing: " + f + " to " + localfolder + " (container folder "+ containerfolder + ")")
+        shutil.move(f, localfolder)
         headers = {'X-Api-Key': readarrApiKey, 'Content-Type': 'application/json'}
-        body = {"name": "DownloadedBooksScan", "path": importfolder}
+        body = {"name": "DownloadedBooksScan", "path": containerfolder}
         response = requests.post(readarrUrl + "/api/v1/command", data=json.dumps(body), headers=headers)
         print(response)
         print(response.json())
@@ -186,21 +186,22 @@ def main():
     searchterm = ""
     readarrUrl = ""
     readarrApiKey = ""
-    if len(sys.argv) == 5:
+    if len(sys.argv) == 6:
         nickname = sys.argv[1]
         readarrUrl = sys.argv[2]
         readarrApiKey = sys.argv[3]
-        importfolder = sys.argv[4]
+        localfolder = sys.argv[4]
+        containerfolder = sys.argv[5]
     elif len(sys.argv) == 3:
         searchterm = sys.argv[1]
         nickname = sys.argv[2]
     else:
-        print("Usage: testbot [<searchterm> <nickname>] | [<nickname> <readarrUrl> <readarrApiKey> <importfolder>]")
+        print("Usage: testbot [<searchterm> <nickname>] | [<nickname> <readarrUrl> <readarrApiKey> <localfolder> <containerfolder>]")
         searchterm = input("Enter Search Term(s):\n")
         if nickname == "":
             nickname = input("Enter Nickname:\n")
     if (readarrUrl != ""):
-        processfiles(readarrUrl, readarrApiKey, importfolder)
+        processfiles(readarrUrl, readarrApiKey, localfolder, containerfolder)
         headers = {'X-Api-Key': readarrApiKey}
         page=1
         wanted = []
