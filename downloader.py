@@ -29,7 +29,7 @@ KNOWN BUGS: If there are no search results, it hangs forever. Sorry.
 filetypes = ".mobi,.epub"
 alwaysoverwrite = True
 acceptfirst = True
-
+searchtimeout = 60
 #Preferred nickname:
 nickname = "" #leave blank to be prompted
 #TODO: Set custom path to save file?
@@ -40,10 +40,12 @@ import irc.bot
 import irc.strings
 from irc.client import ip_numstr_to_quad, ip_quad_to_numstr
 import re
+import threading
 import zipfile
 import os
 import struct
 import sys
+
 import argparse
 import shlex
 from time import sleep
@@ -98,14 +100,22 @@ class TestBot(irc.bot.SingleServerIRCBot):
         self.searchterm = searchterm
         self.received_bytes = 0
         self.havebook = False
-        
+
     def on_nicknameinuse(self, c, e): #handle username conflicts
         c.nick(c.get_nickname() + "_")
 
     def on_welcome(self, c, e):
         c.join(self.channel)
+        self.timer = threading.Timer(searchtimeout, self.handle_timeout)
+        self.timer.start()
         self.connection.privmsg(self.channel, "@search " + self.searchterm)
         print("Searching ...\n")
+
+
+    def handle_timeout(self):
+        print("No search results found")
+        self.timer.cancel()
+        os._exit(1)
 
     def on_ctcp(self, connection, event):
         #Handle the actual download
@@ -144,6 +154,7 @@ class TestBot(irc.bot.SingleServerIRCBot):
         self.my_dcc.send_bytes(struct.pack("!I", self.received_bytes))
 
     def on_dcc_disconnect(self, connection, event):
+        self.timer.cancel()
         self.file.close()
         print("Received file %s (%d bytes).\n" % (self.filename,
                                                 self.received_bytes))
