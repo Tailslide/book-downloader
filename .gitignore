@@ -1,3 +1,4 @@
 /docker_test_env
 /requirements.txt
 /setup_env.bat
+*.pyc
