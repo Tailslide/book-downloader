@@ -27,6 +27,7 @@ KNOWN BUGS: If there are no search results, it hangs forever. Sorry.
 #Settings:
 #Preferred filetype:
 filetypes = ".mobi,.epub"
+omit = "[fr],[ge]"
 searchtimeout = 60
 dltimeout = 360
 alwaysoverwrite = True
@@ -76,6 +77,7 @@ def userselect(filename):
     it lists all available files regardless of filetype.
     """
     ftypes= filetypes.split(",")
+    omits = omit.split(",")
     for ftype in ftypes:
         with zipfile.ZipFile(filename, "r") as z:
             with z.open(z.namelist()[0]) as fin:
@@ -84,7 +86,11 @@ def userselect(filename):
 
                 for line in fin:
                     line = str(line)[2:-5]
-                    if ftype in line.lower():
+                    good = True
+                    for o in omits:
+                        if o in line.lower():
+                            good=False
+                    if good and ftype in line.lower():
                         if acceptfirst:
                             print("Auto downloading file " + line)
                             return line.split("::")[0]
