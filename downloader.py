@@ -198,6 +198,7 @@ def processfiles(readarrUrl, readarrApiKey, localfolder):
     #     shutil.move(f, localfolder)
     headers = {'X-Api-Key': readarrApiKey, 'Content-Type': 'application/json'}
     body = {"name": "DownloadedBooksScan", "path": localfolder}
+    print(body)
     response = requests.post(readarrUrl + "/api/v1/command", data=json.dumps(body), headers=headers)
     print(response)
     print(response.json())
