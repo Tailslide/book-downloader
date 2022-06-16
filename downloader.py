@@ -28,6 +28,7 @@ KNOWN BUGS: If there are no search results, it hangs forever. Sorry.
 #Preferred filetype:
 filetypes = ".mobi,.epub"
 searchtimeout = 60
+dltimeout = 360
 alwaysoverwrite = True
 acceptfirst = True
 
@@ -119,6 +120,7 @@ class TestBot(irc.bot.SingleServerIRCBot):
         os._exit(1)
 
     def on_ctcp(self, connection, event):
+        print("on_ctcp")
         #Handle the actual download
         payload = event.arguments[1]
         parts = shlex.split(payload)
@@ -127,6 +129,8 @@ class TestBot(irc.bot.SingleServerIRCBot):
             return  #If not, we don't care what it is
 
         print("Receiving Data:")
+        self.timer.cancel()
+
         print(payload)
         command, filename, peer_address, peer_port, size = parts
         if command != "SEND":
@@ -161,6 +165,7 @@ class TestBot(irc.bot.SingleServerIRCBot):
         self.file.close()
         print("Received file %s (%d bytes).\n" % (self.filename,
                                                 self.received_bytes))
+        self.timer.cancel()
         #self.connection.quit()
         #Download actual book:
         #Have the user pick which one to download:
@@ -169,6 +174,7 @@ class TestBot(irc.bot.SingleServerIRCBot):
                 print("Search Complete. Please select file to download:\n")
             book = userselect(self.filename)
             if book != "":
+                self.timer = threading.Timer(dltimeout, self.handle_timeout)
                 self.received_bytes = 0
                 self.connection.privmsg(self.channel, book)
                 self.havebook = True
@@ -178,24 +184,23 @@ class TestBot(irc.bot.SingleServerIRCBot):
             else:
                 self.die() #end if user picked quit
         else:
-            self.timer.cancel()
             self.die() #end program when the book disconnect finishes
 
     def search(self, searchterm):
         self.connection.privmsg(self.channel, searchterm)
 
 
-# def processfiles(readarrUrl, readarrApiKey, localfolder, containerfolder):
-#     thispath = get_script_path()
-#     onlyfiles = [f for f in listdir(thispath) if isfile(join(thispath, f)) and f.endswith(tuple(filetypes.split(",")))]
-#     for f in onlyfiles:
-#         print("Importing: " + f + " to " + localfolder + " (container folder "+ containerfolder + ")")
-#         shutil.move(f, localfolder)
-#         headers = {'X-Api-Key': readarrApiKey, 'Content-Type': 'application/json'}
-#         body = {"name": "DownloadedBooksScan", "path": containerfolder}
-#         response = requests.post(readarrUrl + "/api/v1/command", data=json.dumps(body), headers=headers)
-#         print(response)
-#         print(response.json())
+def processfiles(readarrUrl, readarrApiKey, localfolder):
+    # thispath = get_script_path()
+    # onlyfiles = [f for f in listdir(thispath) if isfile(join(thispath, f)) and f.endswith(tuple(filetypes.split(",")))]
+    # for f in onlyfiles:
+    #     print("Importing: " + f + " to " + localfolder + " (container folder "+ containerfolder + ")")
+    #     shutil.move(f, localfolder)
+    headers = {'X-Api-Key': readarrApiKey, 'Content-Type': 'application/json'}
+    body = {"name": "DownloadedBooksScan", "path": localfolder}
+    response = requests.post(readarrUrl + "/api/v1/command", data=json.dumps(body), headers=headers)
+    print(response)
+    print(response.json())
 
 def getwanted(readarrUrl, readarrApiKey):
     #print (readarrUrl)
@@ -245,7 +250,10 @@ def main():
 #        localfolder = sys.argv[4]
 #        containerfolder = sys.argv[5]
 #    elif len(sys.argv) == 3:
-    if len(sys.argv) == 2 and sys.argv[1]=="FINDWANTED":
+    if len(sys.argv) == 2 and sys.argv[1]=="IMPORTFILES":
+        processfiles(readarrUrl,readarrApiKey, localfolder)
+        sys.exit(0)
+    elif len(sys.argv) == 2 and sys.argv[1]=="FINDWANTED":
         searchterm=getwanted(readarrUrl,readarrApiKey)
         print(searchterm)
         sys.exit(0)
