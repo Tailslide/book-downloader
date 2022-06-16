@@ -79,6 +79,7 @@ def userselect(filename):
     ftypes= filetypes.split(",")
     omits = omit.split(",")
     for ftype in ftypes:
+        thisgrp = []
         with zipfile.ZipFile(filename, "r") as z:
             with z.open(z.namelist()[0]) as fin:
 
@@ -91,14 +92,18 @@ def userselect(filename):
                         if o in line.lower():
                             good=False
                     if good and ftype in line.lower():
-                        if acceptfirst:
-                            print("Auto downloading file " + line)
-                            return line.split("::")[0]
-                        answer = input(line + " (y/n/q?)\n")
-                    if answer == "y":
-                        return line.split("::")[0]
-                    if answer == "q":
-                        return ""
+                        thisgrp.insert(0, line.split("::")[0])
+        if (len(thisgrp) > 0 ):
+            return random.choice(thisgrp)
+                        #if acceptfirst:
+                        #    print("Auto downloading file " + line)
+                        #    return line.split("::")[0]
+                        #answer = input(line + " (y/n/q?)\n")
+                    #if answer == "y":
+                    #    return line.split("::")[0]
+                    #if answer == "q":
+                    #    return ""
+    return ""
 
 class TestBot(irc.bot.SingleServerIRCBot):
     def __init__(self, searchterm,  localfolder, channel, nickname, server, port=6667,):
