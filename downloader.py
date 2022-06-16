@@ -27,6 +27,7 @@ KNOWN BUGS: If there are no search results, it hangs forever. Sorry.
 #Settings:
 #Preferred filetype:
 filetypes = ".mobi,.epub"
+searchtimeout = 20
 alwaysoverwrite = True
 acceptfirst = True
 
@@ -44,6 +45,7 @@ import zipfile
 import os
 import struct
 import sys
+import time
 import argparse
 import shlex
 from time import sleep
@@ -98,6 +100,7 @@ class TestBot(irc.bot.SingleServerIRCBot):
         self.searchterm = searchterm
         self.received_bytes = 0
         self.havebook = False
+        self.havesearchresults = False
         
     def on_nicknameinuse(self, c, e): #handle username conflicts
         c.nick(c.get_nickname() + "_")
@@ -106,6 +109,10 @@ class TestBot(irc.bot.SingleServerIRCBot):
         c.join(self.channel)
         self.connection.privmsg(self.channel, "@search " + self.searchterm)
         print("Searching ...\n")
+        time.sleep(searchtimeout)
+        if not self.havesearchresults:
+            print("No search results found")
+            self.die()
 
     def on_ctcp(self, connection, event):
         #Handle the actual download
@@ -120,6 +127,7 @@ class TestBot(irc.bot.SingleServerIRCBot):
         command, filename, peer_address, peer_port, size = parts
         if command != "SEND":
             return
+        print("peer sending file on port" + str(peer_port))
         self.filename = os.path.basename(filename)
         if os.path.exists(self.filename) and not alwaysoverwrite:
             answer = input(
@@ -151,6 +159,7 @@ class TestBot(irc.bot.SingleServerIRCBot):
         #Download actual book:
         #Have the user pick which one to download:
         if not self.havebook:
+            self.havesearchresults =True
             if not acceptfirst:
                 print("Search Complete. Please select file to download:\n")
             book = userselect(self.filename)
@@ -169,6 +178,7 @@ class TestBot(irc.bot.SingleServerIRCBot):
     def search(self, searchterm):
         self.connection.privmsg(self.channel, searchterm)
 
+
 def processfiles(readarrUrl, readarrApiKey, localfolder, containerfolder):
     thispath = get_script_path()
     onlyfiles = [f for f in listdir(thispath) if isfile(join(thispath, f)) and f.endswith(tuple(filetypes.split(",")))]
@@ -184,8 +194,11 @@ def main():
 
     global nickname
     searchterm = ""
-    readarrUrl = ""
-    readarrApiKey = ""
+    readarrUrl = os.getenv('READARR_URL')
+    readarrApiKey = os.getenv('READARR_API_KEY')
+    nickname = os.getenv('NICK')
+    localfolder = os.getenv('LOCAL_TEMP_FOLDER')
+    containerfolder = os.getenv('READARR_TEMP_FOLDER')
     if len(sys.argv) == 6:
         nickname = sys.argv[1]
         readarrUrl = sys.argv[2]
@@ -196,11 +209,13 @@ def main():
         searchterm = sys.argv[1]
         nickname = sys.argv[2]
     else:
-        print("Usage: testbot [<searchterm> <nickname>] | [<nickname> <readarrUrl> <readarrApiKey> <localfolder> <containerfolder>]")
-        searchterm = input("Enter Search Term(s):\n")
-        if nickname == "":
-            nickname = input("Enter Nickname:\n")
-    if (readarrUrl != ""):
+        if (readarrUrl == "" or readarrUrl == None):
+            print("Usage: testbot [<searchterm> <nickname>] | [<nickname> <readarrUrl> <readarrApiKey> <localfolder> <containerfolder>]")
+            searchterm = input("Enter Search Term(s):\n")
+            if nickname == "":
+                nickname = input("Enter Nickname:\n")
+    print (readarrUrl)
+    if (readarrUrl != "" and readarrUrl != None):
         processfiles(readarrUrl, readarrApiKey, localfolder, containerfolder)
         headers = {'X-Api-Key': readarrApiKey}
         page=1
@@ -225,14 +240,14 @@ def main():
         searchterm = w["author"]["authorName"] + " - " + w["title"]
         print("\nRandomly selected:" +searchterm)
     #return
-
+    #searchterm = "Kurt Vonnegut Jr. - God Bless You, Dr. Kevorkian" #this has no results
     server = "irc.irchighway.net"
     port = 6667
     channel = "#ebooks"
     bot = TestBot(searchterm, channel, nickname, server, port)
     bot.start()
     print("Downloaded:" + bot.filename)
-    processfiles(readarrUrl, readarrApiKey, importfolder)
+    processfiles(readarrUrl, readarrApiKey, localfolder, containerfolder)
 
 if __name__ == "__main__":
     main()
