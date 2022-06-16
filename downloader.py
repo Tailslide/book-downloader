@@ -185,23 +185,55 @@ class TestBot(irc.bot.SingleServerIRCBot):
         self.connection.privmsg(self.channel, searchterm)
 
 
-def processfiles(readarrUrl, readarrApiKey, localfolder, containerfolder):
-    thispath = get_script_path()
-    onlyfiles = [f for f in listdir(thispath) if isfile(join(thispath, f)) and f.endswith(tuple(filetypes.split(",")))]
-    for f in onlyfiles:
-        print("Importing: " + f + " to " + localfolder + " (container folder "+ containerfolder + ")")
-        shutil.move(f, localfolder)
-        headers = {'X-Api-Key': readarrApiKey, 'Content-Type': 'application/json'}
-        body = {"name": "DownloadedBooksScan", "path": containerfolder}
-        response = requests.post(readarrUrl + "/api/v1/command", data=json.dumps(body), headers=headers)
-        print(response)
-        print(response.json())
+# def processfiles(readarrUrl, readarrApiKey, localfolder, containerfolder):
+#     thispath = get_script_path()
+#     onlyfiles = [f for f in listdir(thispath) if isfile(join(thispath, f)) and f.endswith(tuple(filetypes.split(",")))]
+#     for f in onlyfiles:
+#         print("Importing: " + f + " to " + localfolder + " (container folder "+ containerfolder + ")")
+#         shutil.move(f, localfolder)
+#         headers = {'X-Api-Key': readarrApiKey, 'Content-Type': 'application/json'}
+#         body = {"name": "DownloadedBooksScan", "path": containerfolder}
+#         response = requests.post(readarrUrl + "/api/v1/command", data=json.dumps(body), headers=headers)
+#         print(response)
+#         print(response.json())
+
+def getwanted(readarrUrl, readarrApiKey):
+    #print (readarrUrl)
+    searchterm=""
+    if (readarrUrl != "" and readarrUrl != None):
+        #processfiles(readarrUrl, readarrApiKey)
+        headers = {'X-Api-Key': readarrApiKey}
+        page=1
+        wanted = []
+        while True:
+            response = requests.get(readarrUrl + "/api/v1/wanted/missing?includeAuthor=false&pageSize=10&page=" + str(page),
+                                    headers=headers)
+            if response != 200:
+                data = response.json()
+                recs = data["records"]
+                if len(recs) == 0:
+                    break
+                wanted = wanted + recs
+            else:
+                print("Error:" + str(response))
+                os._exit(9999)
+                break
+            page = page+1
+        #print("Wanted Books:")
+        #for r in wanted:
+            #print("\t" + r["author"]["authorName"] + " - " + r["title"])
+        w = random.choice(wanted)
+        searchterm = w["author"]["authorName"] + " - " + w["title"]
+        #print("\nRandomly selected:" +searchterm)
+    return searchterm
+
+
 def main():
 
     global nickname
     searchterm = ""
-    #readarrUrl = os.getenv('READARR_URL')
-    #readarrApiKey = os.getenv('READARR_API_KEY')
+    readarrUrl = os.getenv('READARR_URL')
+    readarrApiKey = os.getenv('READARR_API_KEY')
     nickname = os.getenv('NICK')
     localfolder = os.getenv('LOCAL_TEMP_FOLDER')
     #containerfolder = os.getenv('READARR_TEMP_FOLDER')
@@ -213,6 +245,10 @@ def main():
 #        localfolder = sys.argv[4]
 #        containerfolder = sys.argv[5]
 #    elif len(sys.argv) == 3:
+    if len(sys.argv) == 2 and sys.argv[1]=="FINDWANTED":
+        searchterm=getwanted(readarrUrl,readarrApiKey)
+        print(searchterm)
+        sys.exit(0)
     if len(sys.argv) == 4:
         searchterm = sys.argv[1]
         nickname = sys.argv[2]
@@ -225,31 +261,7 @@ def main():
         #            searchterm = input("Enter Search Term(s):\n")
         #            if nickname == "":
         #                nickname = input("Enter Nickname:\n")
-        #     print (readarrUrl)
-        #     if (readarrUrl != "" and readarrUrl != None):
-        #         processfiles(readarrUrl, readarrApiKey, localfolder, containerfolder)
-        #         headers = {'X-Api-Key': readarrApiKey}
-        #         page=1
-        #         wanted = []
-        #         while True:
-        #             response = requests.get(readarrUrl + "/api/v1/wanted/missing?includeAuthor=false&pageSize=10&page=" + str(page),
-        #                                     headers=headers)
-        #             if response != 200:
-        #                 data = response.json()
-        #                 recs = data["records"]
-        #                 if len(recs) == 0:
-        #                     break
-        #                 wanted = wanted + recs
-        #             else:
-        #                 print("Error:" + str(response))
-        #                 break
-        #             page = page+1
-        #         print("Wanted Books:")
-        #         for r in wanted:
-        #             print("\t" + r["author"]["authorName"] + " - " + r["title"])
-        #         w = random.choice(wanted)
-        #         searchterm = w["author"]["authorName"] + " - " + w["title"]
-        #         print("\nRandomly selected:" +searchterm)
+
         #return
         #searchterm = "Kurt Vonnegut Jr. - God Bless You, Dr. Kevorkian" #this has no results
         server = "irc.irchighway.net"
