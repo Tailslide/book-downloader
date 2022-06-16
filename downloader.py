@@ -26,11 +26,16 @@ KNOWN BUGS: If there are no search results, it hangs forever. Sorry.
 
 #Settings:
 #Preferred filetype:
-filetype = "mobi" 
+filetypes = ".mobi,.epub"
+alwaysoverwrite = True
+acceptfirst = True
+
 #Preferred nickname:
 nickname = "" #leave blank to be prompted
 #TODO: Set custom path to save file?
-
+import requests
+import random
+import json
 import irc.bot
 import irc.strings
 from irc.client import ip_numstr_to_quad, ip_quad_to_numstr
@@ -47,6 +52,12 @@ from jaraco.stream import buffer
 import six
 from six.moves import socketserver
 import irc.client
+from os import listdir
+from os.path import isfile, join
+import shutil
+
+def get_script_path():
+    return os.path.dirname(os.path.realpath(sys.argv[0]))
 
 #Prevents a common UnicodeDecodeError when downloading from many sources that don't use utf-8
 irc.client.ServerConnection.buffer_class = buffer.LenientDecodingLineBuffer
@@ -60,30 +71,24 @@ def userselect(filename):
     If the user declines all entries in the preferred format, 
     it lists all available files regardless of filetype.
     """
-    with zipfile.ZipFile(filename, "r") as z:
-        with z.open(z.namelist()[0]) as fin:
+    ftypes= filetypes.split(",")
+    for ftype in ftypes:
+        with zipfile.ZipFile(filename, "r") as z:
+            with z.open(z.namelist()[0]) as fin:
 
-            answer = "n"
+                answer = "n"
 
-            for line in fin:
-                line = str(line)[2:-5]
-                if "mobi" in line.lower():
-                    answer = input(line + " (y/n?)\n")
-                if answer == "y":
-                    return line.split("::")[0]
-            print("No further .mobi lines. Printing lines in order:")
-            print("Please note the first few lines are not valid search results.\n")
-
-    #TODO Fix this mess:
-    with zipfile.ZipFile(filename, "r") as z:
-        with z.open(z.namelist()[0]) as fin:
-            answer = "n"
-            for line in fin:
-                line = str(line)[2:-5]
-                answer = input(line + "(y/n?)\n")
-                if answer == "y":
-                    return line.split("::")[0]
-            print("No further lines. Please search again soon! \n")
+                for line in fin:
+                    line = str(line)[2:-5]
+                    if ftype in line.lower():
+                        if acceptfirst:
+                            print("Auto downloading file " + line)
+                            return line.split("::")[0]
+                        answer = input(line + " (y/n/q?)\n")
+                    if answer == "y":
+                        return line.split("::")[0]
+                    if answer == "q":
+                        return ""
 
 class TestBot(irc.bot.SingleServerIRCBot):
     def __init__(self, searchterm, channel, nickname, server, port=6667):
@@ -116,7 +121,7 @@ class TestBot(irc.bot.SingleServerIRCBot):
         if command != "SEND":
             return
         self.filename = os.path.basename(filename)
-        if os.path.exists(self.filename):
+        if os.path.exists(self.filename) and not alwaysoverwrite:
             answer = input(
                 "A file named", self.filename,
                 "already exists. Overwrite? (y/n)")
@@ -146,37 +151,87 @@ class TestBot(irc.bot.SingleServerIRCBot):
         #Download actual book:
         #Have the user pick which one to download:
         if not self.havebook:
-            print("Search Complete. Please select file to download:\n")
-            book = userselect(self.filename) 
-            self.received_bytes = 0 
-            self.connection.privmsg(self.channel, book)
-            self.havebook = True
-            os.remove(self.filename) #remove the search .zip
-            print("Submitting request for " + book)
+            if not acceptfirst:
+                print("Search Complete. Please select file to download:\n")
+            book = userselect(self.filename)
+            if book != "":
+                self.received_bytes = 0
+                self.connection.privmsg(self.channel, book)
+                self.havebook = True
+                print("Removing File: " + self.filename)
+                os.remove(self.filename) #remove the search .zip
+                print("Submitting request for " + book)
+            else:
+                self.die() #end if user picked quit
         else:
             self.die() #end program when the book disconnect finishes
 
     def search(self, searchterm):
         self.connection.privmsg(self.channel, searchterm)
 
+def processfiles(readarrUrl, readarrApiKey, importfolder):
+    thispath = get_script_path()
+    onlyfiles = [f for f in listdir(thispath) if isfile(join(thispath, f)) and f.endswith(tuple(filetypes.split(",")))]
+    for f in onlyfiles:
+        print("Importing: " + f + " to " + importfolder)
+        shutil.move(f, importfolder)
+        headers = {'X-Api-Key': readarrApiKey, 'Content-Type': 'application/json'}
+        body = {"name": "DownloadedBooksScan", "path": importfolder}
+        response = requests.post(readarrUrl + "/api/v1/command", data=json.dumps(body), headers=headers)
+        print(response)
+        print(response.json())
 def main():
+
     global nickname
     searchterm = ""
-    if len(sys.argv) == 3:
+    readarrUrl = ""
+    readarrApiKey = ""
+    if len(sys.argv) == 5:
+        nickname = sys.argv[1]
+        readarrUrl = sys.argv[2]
+        readarrApiKey = sys.argv[3]
+        importfolder = sys.argv[4]
+    elif len(sys.argv) == 3:
         searchterm = sys.argv[1]
         nickname = sys.argv[2]
     else:
-        print("Usage: testbot <searchterm> <nickname>")
+        print("Usage: testbot [<searchterm> <nickname>] | [<nickname> <readarrUrl> <readarrApiKey> <importfolder>]")
         searchterm = input("Enter Search Term(s):\n")
         if nickname == "":
             nickname = input("Enter Nickname:\n")
+    if (readarrUrl != ""):
+        processfiles(readarrUrl, readarrApiKey, importfolder)
+        headers = {'X-Api-Key': readarrApiKey}
+        page=1
+        wanted = []
+        while True:
+            response = requests.get(readarrUrl + "/api/v1/wanted/missing?includeAuthor=false&pageSize=10&page=" + str(page),
+                                    headers=headers)
+            if response != 200:
+                data = response.json()
+                recs = data["records"]
+                if len(recs) == 0:
+                    break
+                wanted = wanted + recs
+            else:
+                print("Error:" + str(response))
+                break
+            page = page+1
+        print("Wanted Books:")
+        for r in wanted:
+            print("\t" + r["author"]["authorName"] + " - " + r["title"])
+        w = random.choice(wanted)
+        searchterm = w["author"]["authorName"] + " - " + w["title"]
+        print("\nRandomly selected:" +searchterm)
+    #return
 
     server = "irc.irchighway.net"
     port = 6667
     channel = "#ebooks"
-
     bot = TestBot(searchterm, channel, nickname, server, port)
     bot.start()
+    print("Downloaded:" + bot.filename)
+    processfiles(readarrUrl, readarrApiKey, importfolder)
 
 if __name__ == "__main__":
     main()
