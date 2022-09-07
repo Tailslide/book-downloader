@@ -26,7 +26,7 @@ KNOWN BUGS: If there are no search results, it hangs forever. Sorry.
 
 #Settings:
 #Preferred filetype:
-filetypes = ".azw,.mobi,.epub"
+filetypes = ".epub,.azw,.mobi"
 omit = "[fr],[ge]"
 searchtimeout = 60
 dltimeout = 360
