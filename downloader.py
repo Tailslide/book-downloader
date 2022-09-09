@@ -282,6 +282,7 @@ def main():
     readarrApiKey = os.getenv('READARR_API_KEY')
     nickname = os.getenv('NICK')
     localfolder = os.getenv('LOCAL_TEMP_FOLDER')
+    ostempfolder = os.getenv('OS_TEMP_FOLDER')
     #containerfolder = os.getenv('READARR_TEMP_FOLDER')
     searchterm = os.getenv('SEARCH_TERM')
 #    if len(sys.argv) == 6:
@@ -292,8 +293,8 @@ def main():
 #        containerfolder = sys.argv[5]
 #    elif len(sys.argv) == 3:
     if len(sys.argv) == 2 and sys.argv[1]=="IMPORTFILES":
-        print('un-raring files in ' + localfolder)
-        unrar_all(localfolder)
+        print('un-raring files in ' + ostempfolder)
+        unrar_all(ostempfolder)
         processfiles(readarrUrl,readarrApiKey, localfolder)
         sys.exit(0)
     elif len(sys.argv) == 2 and sys.argv[1]=="FINDWANTED":
