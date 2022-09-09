@@ -60,7 +60,8 @@ from os import listdir
 from os.path import isfile, join
 import shutil
 import threading
-
+import patoolib
+import shutil
 def get_script_path():
     return os.path.dirname(os.path.realpath(sys.argv[0]))
 
@@ -215,7 +216,8 @@ def processfiles(readarrUrl, readarrApiKey, localfolder):
     print(response)
     print(response.json())
 
-def getwanted(readarrUrl, readarrApiKey):
+
+def get_wanted(readarrUrl, readarrApiKey):
     #print (readarrUrl)
     searchterm=""
     if (readarrUrl != "" and readarrUrl != None):
@@ -246,10 +248,35 @@ def getwanted(readarrUrl, readarrApiKey):
     return searchterm
 
 
+def unrar_all(folder):
+
+    for root, dirs, files in os.walk(folder):
+        for filename in files:
+            if filename.endswith(".rar"):
+                tempfolder = os.path.join(folder, "extract")
+                shutil.rmtree(tempfolder, True)
+                os.mkdir(tempfolder)
+                rar_file = os.path.join(root, filename)
+                print('RAR:' + rar_file)
+                patoolib.extract_archive(rar_file, outdir=tempfolder)
+                print('Extracted. Removing file ' + rar_file)
+                os.remove(rar_file)
+                # move all files from extract folder to parent
+                for file_name in os.listdir(tempfolder):
+                    temp_file = os.path.join(tempfolder, file_name)
+                    destination_file = os.path.join(folder, file_name)
+                    if os.path.isfile(destination_file):
+                        print('Overwriting file ' + destination_file)
+                        os.remove(destination_file)
+                    print('Moving extracted file ' + temp_file)
+                    shutil.move(temp_file, folder)
+                shutil.rmtree(tempfolder, True)
+
+
 def main():
 
     global nickname
-    searchterm = ""
+#    searchterm = ""
     readarrUrl = os.getenv('READARR_URL')
     readarrApiKey = os.getenv('READARR_API_KEY')
     nickname = os.getenv('NICK')
@@ -264,10 +291,11 @@ def main():
 #        containerfolder = sys.argv[5]
 #    elif len(sys.argv) == 3:
     if len(sys.argv) == 2 and sys.argv[1]=="IMPORTFILES":
+        unrar_all(localfolder)
         processfiles(readarrUrl,readarrApiKey, localfolder)
         sys.exit(0)
     elif len(sys.argv) == 2 and sys.argv[1]=="FINDWANTED":
-        searchterm=getwanted(readarrUrl,readarrApiKey)
+        searchterm=get_wanted(readarrUrl, readarrApiKey)
         print(searchterm)
         sys.exit(0)
     if len(sys.argv) == 4:
