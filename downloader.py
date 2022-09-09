@@ -249,9 +249,10 @@ def get_wanted(readarrUrl, readarrApiKey):
 
 
 def unrar_all(folder):
-
+    print('un-raring all in ' + folder)
     for root, dirs, files in os.walk(folder):
         for filename in files:
+            print('processing ' + filename)
             if filename.endswith(".rar"):
                 tempfolder = os.path.join(folder, "extract")
                 shutil.rmtree(tempfolder, True)
@@ -291,6 +292,7 @@ def main():
 #        containerfolder = sys.argv[5]
 #    elif len(sys.argv) == 3:
     if len(sys.argv) == 2 and sys.argv[1]=="IMPORTFILES":
+        print('un-raring files in ' + localfolder)
         unrar_all(localfolder)
         processfiles(readarrUrl,readarrApiKey, localfolder)
         sys.exit(0)
