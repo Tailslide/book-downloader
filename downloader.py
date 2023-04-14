@@ -226,7 +226,7 @@ def get_wanted(readarrUrl, readarrApiKey):
         page=1
         wanted = []
         while True:
-            response = requests.get(readarrUrl + "/api/v1/wanted/missing?includeAuthor=false&pageSize=10&page=" + str(page),
+            response = requests.get(readarrUrl + "/api/v1/wanted/missing?includeAuthor=true&pageSize=10&page=" + str(page),
                                     headers=headers)
             if response != 200:
                 data = response.json()
